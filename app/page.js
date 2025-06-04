@@ -1,6 +1,6 @@
-"use client";
+'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 
 export default function Home() {
@@ -9,7 +9,6 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [amazonUrl, setAmazonUrl] = useState('');
   const [coverUrl, setCoverUrl] = useState('');
-  const resultRef = useRef(null);
 
   const handleFileChange = (event) => {
     const file = event.target.files?.[0];
@@ -30,24 +29,26 @@ export default function Home() {
     setCoverUrl('');
 
     try {
-      const base64 = await fetch(preview)
-        .then((res) => res.blob())
-        .then(
-          (blob) =>
-            new Promise((resolve, reject) => {
-              const reader = new FileReader();
-              reader.onloadend = () => resolve(reader.result.split(',')[1]);
-              reader.onerror = reject;
-              reader.readAsDataURL(blob);
-            })
-        );
+      const image = new Image();
+      image.src = preview;
+
+      await new Promise((resolve) => (image.onload = resolve));
+
+      const canvas = document.createElement('canvas');
+      const maxSize = 512;
+      const scale = Math.min(maxSize / image.width, maxSize / image.height);
+      canvas.width = image.width * scale;
+      canvas.height = image.height * scale;
+
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+
+      const imageBase64 = canvas.toDataURL('image/jpeg', 0.8).split(',')[1];
 
       const response = await fetch('/api/analyze', {
         method: 'POST',
-        body: JSON.stringify({ imageBase64: base64 }),
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ imageBase64 }),
       });
 
       const data = await response.json();
@@ -55,19 +56,12 @@ export default function Home() {
       setAmazonUrl(data.amazonUrl || '');
       setCoverUrl(data.coverUrl || '');
     } catch (error) {
+      console.error(error);
       setResult('Error analyzing image.');
-      setAmazonUrl('');
-      setCoverUrl('');
     } finally {
       setLoading(false);
     }
   };
-
-  useEffect(() => {
-    if (result && resultRef.current) {
-      resultRef.current.scrollIntoView({ behavior: 'smooth' });
-    }
-  }, [result]);
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-center px-4 py-12 bg-gray-50">
@@ -80,12 +74,7 @@ export default function Home() {
         type="file"
         accept="image/*"
         onChange={handleFileChange}
-        className="mb-6 w-full max-w-xs text-sm text-gray-700
-                   file:mr-4 file:py-2 file:px-4
-                   file:rounded-full file:border-0
-                   file:text-sm file:font-semibold
-                   file:bg-blue-100 file:text-blue-700
-                   hover:file:bg-blue-200"
+        className="mb-6 w-full max-w-xs text-sm file:bg-blue-100 file:border-0 file:rounded file:px-4 file:py-2 file:cursor-pointer"
       />
 
       {preview && (
@@ -105,43 +94,40 @@ export default function Home() {
       )}
 
       {result && (
-        <div
-          ref={resultRef}
-          className="mt-10 w-full max-w-2xl bg-white/70 backdrop-blur border border-white/20 shadow-md rounded-xl p-6 text-gray-800 flex flex-col sm:flex-row gap-6 transition-opacity duration-700 ease-in opacity-100"
-        >
-          {coverUrl && (
-            <img
-              src={coverUrl}
-              alt="Book cover"
-              className="w-32 h-auto object-contain rounded-lg mx-auto sm:mx-0 transition-transform duration-300 hover:-translate-y-1 hover:shadow-xl"
-            />
+        <div className="mt-10 w-full max-w-4xl bg-white border border-gray-200 rounded-xl p-8 shadow-sm text-gray-800 flex flex-col sm:flex-row gap-6 items-center sm:items-start text-center sm:text-left">
+        {coverUrl && (
+          <img
+            src={coverUrl}
+            alt="Book Cover"
+            className="w-32 sm:w-40 rounded shadow-md object-contain"
+          />
+        )}
+        <div className="flex-1">
+          <h2 className="text-2xl font-bold text-blue-900 mb-2 flex items-center gap-2 justify-center sm:justify-start">
+            📖 Recommendation
+          </h2>
+          <p className="text-sm text-gray-500 uppercase mb-4">Recommended by GPT-4o</p>
+          <blockquote className="text-lg text-gray-700 leading-relaxed italic mb-4 prose prose-gray max-w-none mx-auto">
+            <ReactMarkdown>{result}</ReactMarkdown>
+          </blockquote>
+      
+          {amazonUrl && (
+            <a
+              href={amazonUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-block mt-6 bg-yellow-400 hover:bg-yellow-500 text-black font-semibold px-5 py-2 rounded-full shadow transition"
+            >
+              🔗 Search on Amazon
+            </a>
           )}
-          <div className="flex-1">
-            <h2 className="text-2xl font-bold mb-2 text-blue-900 text-center sm:text-left">
-              📖 Recommendation
-            </h2>
-            <span className="text-xs uppercase tracking-wide text-gray-400 block mb-4 text-center sm:text-left">
-              Recommended by GPT-4o
-            </span>
-            <div className="prose prose-lg sm:prose-xl prose-neutral max-w-none text-center sm:text-left">
-              <ReactMarkdown>{result}</ReactMarkdown>
-              {amazonUrl && (
-                <a
-                  href={amazonUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-block mt-6 bg-yellow-400 hover:bg-yellow-500 text-black font-semibold px-5 py-2 rounded-full shadow transition"
-                >
-                  🔗 Search on Amazon
-                </a>
-              )}
-            </div>
-          </div>
         </div>
+      </div>
       )}
-      <footer className="mt-16 text-sm text-gray-500 text-center">
-  Created by <a href="https://github.com/ryanjani" className="underline hover:text-gray-700">ryanjani</a>
-</footer>
+
+      <footer className="mt-16 text-sm text-gray-400 text-center">
+        Created by <a href="https://github.com/ryanjani" className="underline hover:text-gray-600">ryanjani</a>
+      </footer>
     </main>
   );
 }
