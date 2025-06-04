@@ -1,12 +1,8 @@
-// app/api/your-route-name/route.js (or wherever your file is located)
 import { NextResponse } from 'next/server';
 
 export async function POST(req) {
   try {
     const { imageBase64, userPrompt } = await req.json();
-
-    // Log the received request body (optional, but can be useful)
-    console.log('Received request with imageBase64 (first 50 chars):', imageBase64 ? imageBase64.substring(0, 50) + '...' : 'No imageBase64', 'and userPrompt:', userPrompt);
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -24,7 +20,7 @@ export async function POST(req) {
                 type: 'text',
                 text:
                   userPrompt ||
-                  'Recommend 1–2 books that match the mood or feeling of this image. Put the book title in double quotes, and make the full title and author bold like this: **"Charlotte\'s Web" by E.B. White**.',
+                  'Recommend 1–2 books that match the mood or feeling of this image. Format the title and author in **bold**, and use straight double quotes (") around the book title.',
               },
               {
                 type: 'image_url',
@@ -42,39 +38,45 @@ export async function POST(req) {
     const data = await response.json();
 
     if (!response.ok) {
-      console.error('OpenAI API error status:', response.status);
-      console.error('OpenAI API error response data:', data);
+      console.error('OpenAI error:', data);
       return NextResponse.json(
-        { result: 'OpenAI error occurred. Check server logs for details.', amazonUrl: '' },
-        { status: response.status || 500 }
+        { result: 'OpenAI error occurred.' },
+        { status: 500 }
       );
     }
 
     const message = data.choices?.[0]?.message?.content || 'No result found.';
-    console.log('OpenAI raw message content:', message);
 
-    // --- CORRECTED REGEX ---
-    const match = message.match(/"([^"]+)"/); // Look for "Title"
-    console.log('Regex match result (match):', match);
-
-    const searchTerm = match ? match[1] : ''; // match[1] will be the content inside the quotes
-    console.log('Extracted searchTerm:', searchTerm);
-
+    // Extract book title from bolded markdown format: **"Title" by Author**
+    const match = message.match(/\*\*"([^"]+)"/);
+    const searchTerm = match ? match[1] : '';
     const amazonUrl = searchTerm
       ? `https://www.amazon.com/s?k=${encodeURIComponent(searchTerm)}`
       : '';
-    console.log('Generated amazonUrl:', amazonUrl);
+
+    // Try to get cover image from Google Books
+    let coverUrl = '';
+    if (searchTerm) {
+      try {
+        const bookRes = await fetch(
+          `https://www.googleapis.com/books/v1/volumes?q=intitle:${encodeURIComponent(searchTerm)}`
+        );
+        const bookData = await bookRes.json();
+        coverUrl =
+          bookData.items?.[0]?.volumeInfo?.imageLinks?.thumbnail || '';
+      } catch (err) {
+        console.error('Cover fetch error:', err);
+      }
+    }
 
     return NextResponse.json({
       result: message,
       amazonUrl,
+      coverUrl,
     });
 
   } catch (err) {
-    console.error('Server-side catch error:', err);
-    return NextResponse.json(
-      { result: 'Server error. Check server logs for details.', amazonUrl: '' },
-      { status: 500 }
-    );
+    console.error('Server error:', err);
+    return NextResponse.json({ result: 'Server error.' }, { status: 500 });
   }
 }

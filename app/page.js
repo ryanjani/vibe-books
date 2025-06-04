@@ -1,41 +1,65 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
+import React, { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 
 export default function Home() {
   const [preview, setPreview] = useState(null);
-  const [imageBase64, setImageBase64] = useState('');
   const [result, setResult] = useState('');
   const [loading, setLoading] = useState(false);
+  const [amazonUrl, setAmazonUrl] = useState('');
+  const [coverUrl, setCoverUrl] = useState('');
 
-  const handleFileChange = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      const base64 = reader.result.split(',')[1];
-      setImageBase64(base64);
-      setPreview(reader.result);
-    };
-    reader.readAsDataURL(file);
+  const handleFileChange = (event) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      setPreview(URL.createObjectURL(file));
+      setResult('');
+      setAmazonUrl('');
+      setCoverUrl('');
+    }
   };
 
   const analyzeImage = async () => {
+    if (!preview) return;
+
     setLoading(true);
-    const res = await fetch('/api/analyze', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        imageBase64,
-        userPrompt: 'Recommend a book that fits the feeling of this image.',
-      }),
-    });
-    const data = await res.json();
-    console.log('GPT result:', data.result);
-    setResult(data.result);
-    setLoading(false);
+    setResult('');
+    setAmazonUrl('');
+    setCoverUrl('');
+
+    try {
+      const base64 = await fetch(preview)
+        .then((res) => res.blob())
+        .then(
+          (blob) =>
+            new Promise((resolve, reject) => {
+              const reader = new FileReader();
+              reader.onloadend = () => resolve(reader.result.split(',')[1]);
+              reader.onerror = reject;
+              reader.readAsDataURL(blob);
+            })
+        );
+
+      const response = await fetch('/api/analyze', {
+        method: 'POST',
+        body: JSON.stringify({ imageBase64: base64 }),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const data = await response.json();
+      setResult(data.result || '');
+      setAmazonUrl(data.amazonUrl || '');
+      setCoverUrl(data.coverUrl || '');
+    } catch (error) {
+      setResult('Error analyzing image.');
+      setAmazonUrl('');
+      setCoverUrl('');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -46,16 +70,16 @@ export default function Home() {
       </h1>
 
       <input
-  type="file"
-  accept="image/*"
-  onChange={handleFileChange}
-  className="mb-6 w-full max-w-xs text-sm text-gray-700
-             file:mr-4 file:py-2 file:px-4
-             file:rounded-full file:border-0
-             file:text-sm file:font-semibold
-             file:bg-blue-100 file:text-blue-700
-             hover:file:bg-blue-200"
-/>
+        type="file"
+        accept="image/*"
+        onChange={handleFileChange}
+        className="mb-6 w-full max-w-xs text-sm text-gray-700
+                   file:mr-4 file:py-2 file:px-4
+                   file:rounded-full file:border-0
+                   file:text-sm file:font-semibold
+                   file:bg-blue-100 file:text-blue-700
+                   hover:file:bg-blue-200"
+      />
 
       {preview && (
         <>
@@ -74,14 +98,32 @@ export default function Home() {
       )}
 
       {result && (
-        <div className="mt-10 w-full max-w-2xl bg-white border border-gray-200 rounded-xl p-6 shadow-sm text-gray-800">
-          <h2 className="text-2xl font-bold mb-4 text-blue-900 text-center">
-            📖 Recommendation
-          </h2>
-          <div className="prose prose-lg text-center text-gray-800">
-            <ReactMarkdown>
-              {result}
-            </ReactMarkdown>
+        <div className="mt-10 w-full max-w-2xl bg-white border border-gray-200 rounded-xl p-6 shadow-sm text-gray-800 flex flex-col sm:flex-row gap-6">
+          {coverUrl && (
+            <img
+              src={coverUrl}
+              alt="Book cover"
+              className="w-32 h-auto object-contain rounded-lg mx-auto sm:mx-0"
+            />
+          )}
+          <div className="flex-1">
+            <h2 className="text-2xl font-bold mb-4 text-blue-900 text-center sm:text-left">
+              📖 Recommendation
+            </h2>
+            <div className="prose prose-lg text-center sm:text-left text-gray-800">
+              <ReactMarkdown>{result}</ReactMarkdown>
+
+              {amazonUrl && (
+                <a
+                  href={amazonUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-block mt-6 bg-yellow-400 hover:bg-yellow-500 text-black font-semibold px-5 py-2 rounded-full shadow transition"
+                >
+                  🔗 Search on Amazon
+                </a>
+              )}
+            </div>
           </div>
         </div>
       )}
