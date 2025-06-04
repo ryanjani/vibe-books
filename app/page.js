@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
 
 export default function Home() {
@@ -9,6 +9,7 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [amazonUrl, setAmazonUrl] = useState('');
   const [coverUrl, setCoverUrl] = useState('');
+  const resultRef = useRef(null);
 
   const handleFileChange = (event) => {
     const file = event.target.files?.[0];
@@ -62,6 +63,12 @@ export default function Home() {
     }
   };
 
+  useEffect(() => {
+    if (result && resultRef.current) {
+      resultRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [result]);
+
   return (
     <main className="flex min-h-screen flex-col items-center justify-center px-4 py-12 bg-gray-50">
       <h1 className="text-4xl sm:text-5xl font-serif font-semibold text-center leading-tight text-gray-800 mb-10">
@@ -98,21 +105,26 @@ export default function Home() {
       )}
 
       {result && (
-        <div className="mt-10 w-full max-w-2xl bg-white border border-gray-200 rounded-xl p-6 shadow-sm text-gray-800 flex flex-col sm:flex-row gap-6">
+        <div
+          ref={resultRef}
+          className="mt-10 w-full max-w-2xl bg-white/70 backdrop-blur border border-white/20 shadow-md rounded-xl p-6 text-gray-800 flex flex-col sm:flex-row gap-6 transition-opacity duration-700 ease-in opacity-100"
+        >
           {coverUrl && (
             <img
               src={coverUrl}
               alt="Book cover"
-              className="w-32 h-auto object-contain rounded-lg mx-auto sm:mx-0"
+              className="w-32 h-auto object-contain rounded-lg mx-auto sm:mx-0 transition-transform duration-300 hover:-translate-y-1 hover:shadow-xl"
             />
           )}
           <div className="flex-1">
-            <h2 className="text-2xl font-bold mb-4 text-blue-900 text-center sm:text-left">
+            <h2 className="text-2xl font-bold mb-2 text-blue-900 text-center sm:text-left">
               📖 Recommendation
             </h2>
-            <div className="prose prose-lg text-center sm:text-left text-gray-800">
+            <span className="text-xs uppercase tracking-wide text-gray-400 block mb-4 text-center sm:text-left">
+              Recommended by GPT-4o
+            </span>
+            <div className="prose prose-lg sm:prose-xl prose-neutral max-w-none text-center sm:text-left">
               <ReactMarkdown>{result}</ReactMarkdown>
-
               {amazonUrl && (
                 <a
                   href={amazonUrl}
