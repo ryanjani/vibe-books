@@ -46,11 +46,16 @@ export default function Home() {
       </h1>
 
       <input
-        type="file"
-        accept="image/*"
-        onChange={handleFileChange}
-        className="mb-6 w-full max-w-xs text-sm file:bg-blue-100 file:border-0 file:rounded file:px-4 file:py-2 file:cursor-pointer"
-      />
+  type="file"
+  accept="image/*"
+  onChange={handleFileChange}
+  className="mb-6 w-full max-w-xs text-sm text-gray-700
+             file:mr-4 file:py-2 file:px-4
+             file:rounded-full file:border-0
+             file:text-sm file:font-semibold
+             file:bg-blue-100 file:text-blue-700
+             hover:file:bg-blue-200"
+/>
 
       {preview && (
         <>
