@@ -139,6 +139,9 @@ export default function Home() {
           </div>
         </div>
       )}
+      <footer className="mt-16 text-sm text-gray-500 text-center">
+  Created by <a href="https://github.com/ryanjani" className="underline hover:text-gray-700">ryanjani</a>
+</footer>
     </main>
   );
 }
